@@ -1,0 +1,54 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"os"
+	"os/exec"
+	"syscall"
+	//"strings"
+	//"encoding/json"
+	"github.com/pborman/getopt/v2"
+	//"github.com/alessio/shellescape"
+)
+
+var (
+	shell = "/bin/sh -c "
+)
+
+func runCommand(cmd string, wg *sync.WaitGroup) {
+	var exitCode int
+
+	out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if exitError, ok := err.(*exec.ExitError); ok {
+		if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
+			exitCode = status.ExitStatus()
+		}
+	}
+	fmt.Printf("[debug:output] %s\n", out)
+	fmt.Printf("[debug] Command returned exit-code: %d\n", exitCode)
+	wg.Done()
+}
+
+func getCommandLineArgs() string {
+	var userCommand string
+	getopt.FlagLong(&userCommand, "command",  'c', "Command to run")
+	getopt.Parse()
+	if !getopt.IsSet("command") {
+		getopt.PrintUsage(os.Stdout)
+		fmt.Println("\n[error] you need to specify command!")
+		os.Exit(1)
+	}
+	return userCommand
+}
+
+func main() {
+	userCommand := getCommandLineArgs()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+
+	//cmd := shellescape.Quote(userCommand)
+	//go runCommand(cmd, wg)
+	go runCommand(userCommand, wg)
+	wg.Wait()
+}
