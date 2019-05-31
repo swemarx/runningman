@@ -6,25 +6,26 @@ import (
 	"os/exec"
 	"os/user"
 	"time"
+	"strings"
 	"syscall"
-	"strconv"
 	"encoding/json"
 	"github.com/pborman/getopt/v2"
 )
 
 var (
-	shell = "/bin/sh -c "
+	shellCommand = "/bin/sh -c"
 	debugMode = false
+	cliHostname string
 )
 
 type report struct {
 	CommandLine string `json:"commandline"`
-	Username string `json:"username"`
-	Hostname string `json:"hostname"`
-	StartTime string `json:"starttime"`
+	Username    string `json:"username"`
+	Hostname    string `json:"hostname"`
+	StartTime   string `json:"starttime"`
 	ElapsedTime string `json:"elapsedtime"`
-	ExitCode string `json:"exitcode"`
-	Output string `json:"output"`
+	ExitCode    string `json:"exitcode"`
+	Output      string `json:"output"`
 }
 
 type envelope struct {
@@ -35,35 +36,43 @@ func runCommand(cmd string) *report {
 	var report report
 
 	report.CommandLine = cmd
-	hostname, err := os.Hostname()
-	if err != nil {
-		report.Hostname = "N/A"
+	if !getopt.IsSet("hostname") {
+		hostname, hostnameErr := os.Hostname()
+		if hostnameErr != nil {
+			report.Hostname = "N/A"
+		} else {
+			report.Hostname = hostname
+		}
 	} else {
-		report.Hostname = hostname
+		report.Hostname = cliHostname
 	}
-	currentUser, err := user.Current()
-	if err != nil {
+
+	username, usernameErr := user.Current()
+	if usernameErr != nil {
 		report.Username = "N/A"
 	} else {
-		report.Username = currentUser.Username
+		report.Username = username.Username
 	}
+
+	shellParts := strings.Fields(shellCommand + " " + cmd)
+
 	startTime := time.Now()
 	report.StartTime = startTime.String()
-	output, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-	elapsedTime := time.Now().Sub(startTime).Seconds()
-	report.ElapsedTime = fmt.Sprintf("%f", elapsedTime)
-	report.Output = string(output)
+	output, err := exec.Command(shellParts[0], shellParts[1], strings.Join(shellParts[2:], " ")).CombinedOutput()
 	if exitError, ok := err.(*exec.ExitError); ok {
 		if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
-			//fmt.Printf("EXITCODE: %d\n", status.ExitStatus())
-			report.ExitCode = strconv.Itoa(status.ExitStatus())
-			//report.ExitCode = fmt.Sprintf("%d", status.ExitStatus())
+			exitCode := status.ExitStatus()
+			report.ExitCode = fmt.Sprintf("%d", exitCode)
 		} else {
 			report.ExitCode = "-1"
 		}
 	} else {
-		//fmt.Println("THIRD ONE")
+		report.ExitCode = "0"
 	}
+
+	elapsedTime := time.Now().Sub(startTime).Seconds()
+	report.ElapsedTime = fmt.Sprintf("%f", elapsedTime)
+	report.Output = string(output)
 
 	if(debugMode) {
 		fmt.Printf("[debug] commandline: %s\n", report.CommandLine)
@@ -80,8 +89,10 @@ func runCommand(cmd string) *report {
 
 func getCommandLineArgs() string {
 	var userCommand string
-	getopt.FlagLong(&userCommand, "command",  'c', "Command to run")
-	getopt.FlagLong(&debugMode,   "debug",    'd', "Debug-mode")
+	getopt.FlagLong(&shellCommand, "shell",    's', "Shell (default: \"/bin/sh -c\")")
+	getopt.FlagLong(&userCommand,  "command",  'c', "Command to run")
+	getopt.FlagLong(&cliHostname,  "hostname", 'h', "Hostname")
+	getopt.FlagLong(&debugMode,    "debug",    'd', "Debugmode (default: false)")
 	getopt.Parse()
 	if !getopt.IsSet("command") {
 		getopt.PrintUsage(os.Stdout)
