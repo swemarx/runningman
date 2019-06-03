@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	shellCommand = "/bin/sh -c"
-	debugMode = false
-	cliHostname string
+	userShell = "/bin/sh -c"
+	userDebug = false
+	userHostname string
 )
 
 type report struct {
@@ -44,7 +44,7 @@ func runCommand(cmd string) *report {
 			report.Hostname = hostname
 		}
 	} else {
-		report.Hostname = cliHostname
+		report.Hostname = userHostname
 	}
 
 	username, usernameErr := user.Current()
@@ -54,7 +54,7 @@ func runCommand(cmd string) *report {
 		report.Username = username.Username
 	}
 
-	shellParts := strings.Fields(shellCommand + " " + cmd)
+	shellParts := strings.Fields(userShell + " " + cmd)
 
 	startTime := time.Now()
 	report.StartTime = startTime.String()
@@ -74,7 +74,7 @@ func runCommand(cmd string) *report {
 	report.ElapsedTime = fmt.Sprintf("%f", elapsedTime)
 	report.Output = string(output)
 
-	if(debugMode) {
+	if(userDebug) {
 		fmt.Printf("[debug] commandline: %s\n", report.CommandLine)
 		fmt.Printf("[debug] user: %s\n", report.Username)
 		fmt.Printf("[debug] hostname: %s\n", report.Hostname)
@@ -89,10 +89,10 @@ func runCommand(cmd string) *report {
 
 func getCommandLineArgs() string {
 	var userCommand string
-	getopt.FlagLong(&shellCommand, "shell",    's', "Shell (default: \"/bin/sh -c\")")
+	getopt.FlagLong(&userShell,    "shell",    's', "Shell (default: \"/bin/sh -c\")")
 	getopt.FlagLong(&userCommand,  "command",  'c', "Command to run")
-	getopt.FlagLong(&cliHostname,  "hostname", 'h', "Hostname")
-	getopt.FlagLong(&debugMode,    "debug",    'd', "Debugmode (default: false)")
+	getopt.FlagLong(&userHostname, "hostname", 'h', "Hostname")
+	getopt.FlagLong(&userDebug,    "debug",    'd', "Debugmode (default: false)")
 	getopt.Parse()
 	if !getopt.IsSet("command") {
 		getopt.PrintUsage(os.Stdout)
