@@ -7,15 +7,21 @@ import (
 	"os/user"
 	"time"
 	"strings"
+	"strconv"
 	"syscall"
 	"encoding/json"
 	"github.com/pborman/getopt/v2"
 )
 
 var (
+	buildVersion string			// populated during build-process, see Makefile
+	buildTime string			// populated during build-process, see Makefile
 	userShell = "/bin/sh -c"
 	userDebug = false
+	userCommand string
 	userHostname string
+	userEndpoint string
+	userTimeout = 10
 )
 
 type report struct {
@@ -39,7 +45,7 @@ func runCommand(cmd string) *report {
 	if !getopt.IsSet("hostname") {
 		hostname, hostnameErr := os.Hostname()
 		if hostnameErr != nil {
-			report.Hostname = "N/A"
+			report.Hostname = "<Error>"
 		} else {
 			report.Hostname = hostname
 		}
@@ -49,7 +55,7 @@ func runCommand(cmd string) *report {
 
 	username, usernameErr := user.Current()
 	if usernameErr != nil {
-		report.Username = "N/A"
+		report.Username = "<Error>"
 	} else {
 		report.Username = username.Username
 	}
@@ -72,7 +78,12 @@ func runCommand(cmd string) *report {
 
 	elapsedTime := time.Now().Sub(startTime).Seconds()
 	report.ElapsedTime = fmt.Sprintf("%f", elapsedTime)
-	report.Output = string(output)
+
+	if len(string(output)) == 0 {
+		report.Output = "<None>\n"
+	} else {
+		report.Output = string(output)
+	}
 
 	if(userDebug) {
 		fmt.Printf("[debug] commandline: %s\n", report.CommandLine)
@@ -82,28 +93,48 @@ func runCommand(cmd string) *report {
 		fmt.Printf("[debug] elapsed-time: %s\n", report.ElapsedTime)
 		fmt.Printf("[debug] exitcode: %s\n", report.ExitCode)
 		fmt.Printf("[debug] see below:\n%s", report.Output)
+		fmt.Printf("[debug] endpoint: %s\n", userEndpoint)
+		fmt.Printf("[debug] timeout: %d\n", userTimeout)
 	}
 
 	return &report
 }
 
-func getCommandLineArgs() string {
-	var userCommand string
+func getAndValidateArgs() {
+	var (
+		command string
+		timeout string
+	)
+
+	getopt.FlagLong(&command,      "command",  'c', "Command to run")
+	getopt.FlagLong(&timeout,      "timeout",  't', "Timeout (in seconds) for report submission")
 	getopt.FlagLong(&userShell,    "shell",    's', "Shell (default: \"/bin/sh -c\")")
-	getopt.FlagLong(&userCommand,  "command",  'c', "Command to run")
 	getopt.FlagLong(&userHostname, "hostname", 'h', "Hostname")
+	getopt.FlagLong(&userEndpoint, "endpoint", 'e', "Endpoint where to send report (\"host:port\")")
 	getopt.FlagLong(&userDebug,    "debug",    'd', "Debugmode (default: false)")
 	getopt.Parse()
-	if !getopt.IsSet("command") {
+
+	// Check mandatory arguments
+	if !getopt.IsSet("command") || !getopt.IsSet("endpoint") {
+		fmt.Printf("runningman %s, built %s\n", buildVersion, buildTime)
 		getopt.PrintUsage(os.Stdout)
-		fmt.Println("\n[error] you need to specify command!")
+		fmt.Println("\n[error] you need to specify command and endpoint!")
 		os.Exit(1)
 	}
-	return userCommand
+
+	// Validate arguments that need it
+	if getopt.IsSet("timeout") {
+		timeoutAsInt, err := strconv.Atoi(timeout)
+		if err != nil || userTimeout < 1 {
+			fmt.Println("[error] timeout must be a positive integer")
+			os.Exit(1)
+		}
+		userTimeout = timeoutAsInt
+	}
 }
 
 func main() {
-	userCommand := getCommandLineArgs()
+	getAndValidateArgs()
 	var envelope envelope
 	envelope.Message = *(runCommand(userCommand))
 	jsonOutput, err := json.Marshal(envelope)
@@ -111,5 +142,6 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(string(jsonOutput))
+	//fmt.Println(string(jsonOutput))
+	tcpSend(userEndpoint, jsonOutput, time.Duration(userTimeout) * time.Second)
 }
