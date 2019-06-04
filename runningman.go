@@ -102,12 +102,11 @@ func runCommand(cmd string) *report {
 
 func getAndValidateArgs() {
 	var (
-		command string
 		timeout string
 	)
 
-	getopt.FlagLong(&command,      "command",  'c', "Command to run")
 	getopt.FlagLong(&timeout,      "timeout",  't', "Timeout (in seconds) for report submission")
+	getopt.FlagLong(&userCommand,  "command",  'c', "Command to run")
 	getopt.FlagLong(&userShell,    "shell",    's', "Shell (default: \"/bin/sh -c\")")
 	getopt.FlagLong(&userHostname, "hostname", 'h', "Hostname")
 	getopt.FlagLong(&userEndpoint, "endpoint", 'e', "Endpoint where to send report (\"host:port\")")

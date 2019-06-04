@@ -21,7 +21,7 @@ func tcpSend(socket string, data []byte, timeout time.Duration) {
 	}
 
 	if userDebug {
-		fmt.Print("[debug] Sent data successfully!\n")
+		fmt.Print("[debug] Sent data to endpoint successfully!\n")
 	}
 
 	conn.Close()
