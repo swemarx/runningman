@@ -92,7 +92,7 @@ func runCommand(cmd string) *report {
 		fmt.Printf("[debug] start-time: %s\n", report.StartTime)
 		fmt.Printf("[debug] elapsed-time: %s\n", report.ElapsedTime)
 		fmt.Printf("[debug] exitcode: %s\n", report.ExitCode)
-		fmt.Printf("[debug] see below:\n%s", report.Output)
+		fmt.Printf("[debug] output below:\n%s", report.Output)
 		fmt.Printf("[debug] endpoint: %s\n", userEndpoint)
 		fmt.Printf("[debug] timeout: %d\n", userTimeout)
 	}
