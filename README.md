@@ -1,6 +1,6 @@
 # runningman
 
-runningmans purpose is to run jobs, capture the results and submit them (as JSON) to Logstash. We wanted to minimize the use of emails and eliminate the need to scan mailboxes for results of running important jobs. We also wanted to record other metrics such as execution-time, exitcode and output for any kind of shell-expression/script/binary and make it searchable using a standard ELK-setup.
+runningmans purpose is to run jobs, capture the results and submit them (as JSON) to Logstash or (as text) to a local logfile. We wanted to minimize the use of emails and eliminate the need to scan mailboxes for results of running important jobs. We also wanted to record other metrics such as execution-time, exitcode and output for any kind of shell-expression/script/binary and make it searchable using a standard ELK-setup or by using monitoring (Zabbix in our case) a logfile.
 
 ## Getting started
 
