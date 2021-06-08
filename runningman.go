@@ -68,7 +68,8 @@ func runCommand(cmd string) *report {
 	shellParts := strings.Fields(userShell + " " + cmd)
 
 	startTime := time.Now()
-	report.StartTime = startTime.String()
+	//report.StartTime = startTime.Format(time.RFC3339)
+	report.StartTime = startTime.Format("2006-01-02 15:04:05")
 	output, err := exec.Command(shellParts[0], shellParts[1], strings.Join(shellParts[2:], " ")).CombinedOutput()
 	if exitError, ok := err.(*exec.ExitError); ok {
 		if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
