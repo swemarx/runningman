@@ -12,9 +12,11 @@ make
 
 ## Prerequisites
 
-golang (I've used 1.10.3)
+golang (I've used 1.16.4)
 make
 Logstash setup somewhere accessible as en endpoint (the --endpoint option)
+OR
+local logfile
 
 ### Installing
 
@@ -27,8 +29,8 @@ copy runningman /wherever/
 Getting help
 ```
 $ ./runningman
-runningman f519da9, built 2019-06-03T14:33:21Z
-Usage: runningman [-d] [-c value] [-e value] [-h value] [-s value] [-t value] [parameters ...]
+runningman b2cf985, built 2021-06-08T12:11:45Z
+Usage: runningman [-d] [-c value] [-e value] [-h value] [-l value] [-n value] [-s value] [-t value] [parameters ...]
  -c, --command=value
                     Command to run
  -d, --debug        Debugmode (default: false)
@@ -36,14 +38,17 @@ Usage: runningman [-d] [-c value] [-e value] [-h value] [-s value] [-t value] [p
                     Endpoint where to send report ("host:port")
  -h, --hostname=value
                     Hostname
- -s, --shell=value  Shell (default: "/bin/sh -c")
+ -l, --logfile=value
+                    Log to local file
+ -n, --name=value   Name of job
+ -s, --shell=value  Shell (default: "/bin/sh -c") [/bin/sh -c]
  -t, --timeout=value
-                    Timeout (in seconds) for report submission
+                    Timeout (in seconds) for endpoint submission
 
-[error] you need to specify command and endpoint!
+[error] you must specify command, name and endpoint and/or logfile!
 ```
 
-Note that -c/--command and -e/--endpoint are mandatory!
+Note that -n/--name, -c/--command and -e/--endpoint|-l/--logfile are mandatory!
 
 Running a shell-expression and submitting the result to a Logstash running at 172.20.16.20:1987, activating debug-output to see what happens
 ```
