@@ -136,7 +136,7 @@ func getAndValidateArgs() {
 	getopt.Parse()
 
 	// Check mandatory arguments
-	if !getopt.IsSet("command") || !getopt.IsSet("name") || (!getopt.IsSet("endpoint") && (!getopt.IsSet("logfile"))) {
+	if !getopt.IsSet("command") || !getopt.IsSet("name") || (!getopt.IsSet("endpoint") && !getopt.IsSet("logfile") && !getopt.IsSet("logscreen")) {
 		fmt.Printf("runningman %s, built %s\n", buildVersion, buildTime)
 		getopt.PrintUsage(os.Stdout)
 		fmt.Println("\n[error] you must specify command, name and endpoint and/or logfile!")
