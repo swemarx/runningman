@@ -19,12 +19,14 @@ var (
 	buildTime string			// populated during build-process, see Makefile
 	userShell = "/bin/sh -c"
 	userJobName string
-	userDebug = false
-	userLogfile string
 	userCommand string
 	userHostname string
+	userLogfile string
 	userEndpoint string
+	userLogOutput = false
 	userTimeout = 10
+	userDebug = false
+	userLogScreen = false
 )
 
 type report struct {
@@ -35,11 +37,12 @@ type report struct {
 	StartTime   string `json:"starttime"`
 	ElapsedSecs string `json:"elapsedsecs"`
 	ExitCode    string `json:"exitcode"`
+	LogOutput	string `json:"output"`
 	Output      string `json:"output"`
 }
 
 type envelope struct {
-	Message report `json:"message"`
+	result report `json:"result"`
 }
 
 func runCommand(cmd string) *report {
@@ -85,10 +88,13 @@ func runCommand(cmd string) *report {
 	elapsedSeconds := time.Now().Sub(startTime).Seconds()
 	report.ElapsedSecs = fmt.Sprintf("%f", elapsedSeconds)
 
-	if len(string(output)) == 0 {
-		report.Output = "<None>\n"
-	} else {
-		report.Output = string(output)
+	report.LogOutput = strconv.FormatBool(userLogOutput)
+	if userLogOutput {
+		if len(string(output)) == 0 {
+			report.Output = "<None>\n"
+		} else {
+			report.Output = string(output)
+		}
 	}
 
 	if(userDebug) {
@@ -99,6 +105,7 @@ func runCommand(cmd string) *report {
 		fmt.Printf("[debug] start-time: %s\n", report.StartTime)
 		fmt.Printf("[debug] elapsed-seconds: %s\n", report.ElapsedSecs)
 		fmt.Printf("[debug] exitcode: %s\n", report.ExitCode)
+		fmt.Printf("[debug] log-output: %s\n", report.LogOutput)
 		fmt.Printf("[debug] output below:\n%s", report.Output)
 		if len(userEndpoint) > 0 {
 			fmt.Printf("[debug] endpoint: %s\n", userEndpoint)
@@ -116,14 +123,16 @@ func getAndValidateArgs() {
 		timeout string
 	)
 
-	getopt.FlagLong(&userJobName,  "name",     'n', "Name of job")
-	getopt.FlagLong(&userShell,    "shell",    's', "Shell (default: \"/bin/sh -c\")")
-	getopt.FlagLong(&userLogfile,  "logfile",  'l', "Log to local file")
-	getopt.FlagLong(&userCommand,  "command",  'c', "Command to run")
-	getopt.FlagLong(&userHostname, "hostname", 'h', "Hostname")
-	getopt.FlagLong(&userEndpoint, "endpoint", 'e', "Endpoint where to send report (\"host:port\")")
-	getopt.FlagLong(&timeout,      "timeout",  't', "Timeout (in seconds) for endpoint submission")
-	getopt.FlagLong(&userDebug,    "debug",    'd', "Debugmode (default: false)")
+	getopt.FlagLong(&userJobName,  "name",           'n', "Name of job")
+	getopt.FlagLong(&userShell,    "shell",          'S', "Shell (default: \"/bin/sh -c\")")
+	getopt.FlagLong(&userLogfile,  "logfile",        'f', "Log to local file")
+	getopt.FlagLong(&userCommand,  "command",        'c', "Command to run")
+	getopt.FlagLong(&userHostname, "hostname",       'h', "Hostname")
+	getopt.FlagLong(&userEndpoint, "endpoint",       'e', "Endpoint where to send report (\"host:port\")")
+	getopt.FlagLong(&timeout,      "timeout",        't', "Timeout (in seconds) for endpoint submission")
+	getopt.FlagLong(&userDebug,    "debug",          'd', "Debugmode (default: false)")
+	getopt.FlagLong(&userLogScreen,"logscreen",      's', "Log to stdout")
+	getopt.FlagLong(&userLogOutput,"capture-output", 'o', "Include output in log-file (default: false)")
 	getopt.Parse()
 
 	// Check mandatory arguments
@@ -165,20 +174,29 @@ func tcpSend(socket string, data []byte, timeout time.Duration) {
 	conn.Close()
 }
 
+func prepareReportForOutput(r report) string {
+	s := "# " + r.StartTime + " " +
+		"name:" + r.JobName + " " +
+		"host:" + r.Hostname + " " +
+		"user:" + r.Username + " " +
+		"elapsed:" + r.ElapsedSecs + " " +
+		"exitcode:" + r.ExitCode + " " +
+		"log-output:" + r.LogOutput + "\n"
+
+	if userLogOutput {
+		s += r.Output
+	}
+
+	return s
+}
+
 // Writes a report to file as a single-line. Omits the output.
-func fileWrite(path string, r report) {
+func writeLog(path string, output string) {
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Printf("[error] could not open logfile %s: %s\n", path, err.Error()) 
 	}
 	defer f.Close()
-	var output string
-	output += r.StartTime + " " +
-		"name:" + r.JobName + " " +
-		"host:" + r.Hostname + " " +
-		"user:" + r.Username + " " +
-		"elapsed:" + r.ElapsedSecs + " " +
-		"exitcode:" + r.ExitCode + "\n"
 	if _, err := f.WriteString(output); err != nil {
 		fmt.Printf("[error] could not write to logfile %s: %s\n", path, err.Error())
 	}
@@ -186,9 +204,11 @@ func fileWrite(path string, r report) {
 
 func main() {
 	getAndValidateArgs()
-	var envelope envelope
-	envelope.Message = *(runCommand(userCommand))
 
+	var envelope envelope
+	envelope.result = *(runCommand(userCommand))
+
+	// If sending over the network, turn it into json.
 	if getopt.IsSet("endpoint") {
 		jsonOutput, err := json.Marshal(envelope)
 		if err != nil {
@@ -197,8 +217,22 @@ func main() {
 		}
 		//fmt.Println(string(jsonOutput))
 		tcpSend(userEndpoint, jsonOutput, time.Duration(userTimeout) * time.Second)
-	} else if getopt.IsSet("logfile") {
-		// open file and output
-		fileWrite(userLogfile, envelope.Message)
+	}
+
+	// If logging to file or screen, format it appropriately.
+	if getopt.IsSet("logfile") || getopt.IsSet("logscreen") {
+		s := prepareReportForOutput(envelope.result)
+
+		if getopt.IsSet("logfile") {
+			// open file and output
+			writeLog(userLogfile, s)
+		}
+
+		if getopt.IsSet("logfile") {
+			fmt.Printf("%s", s)
+		}
+
+		if getopt.IsSet("logscreen") {
+		}
 	}
 }
