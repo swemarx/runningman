@@ -228,11 +228,8 @@ func main() {
 			writeLog(userLogfile, s)
 		}
 
-		if getopt.IsSet("logfile") {
-			fmt.Printf("%s", s)
-		}
-
 		if getopt.IsSet("logscreen") {
+			fmt.Printf("%s", s)
 		}
 	}
 }
